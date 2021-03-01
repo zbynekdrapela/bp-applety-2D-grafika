@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="cs-cz">
+<head>
+    <meta charset="UTF-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>Zvýšení stupně Bézierovy křivky beze změny jejího tvaru</title>
+    <script charset="UTF-8" src="jsxgraphcore.js" type="text/javascript"></script>
+    <link href="jsxgraph.css" rel="stylesheet" type="text/css"/>
+    <link href="darkModeStyle.css" rel="stylesheet" type="text/css"/>
+    <link href="appletStyle.css" rel="stylesheet" type="text/css"/>
+</head>
+<body>
+<header>
+    <div class="header1"><h1>Zvýšení stupně Bézierovy křivky beze změny jejího tvaru</h1></div>
+    <div class="user-toggle">
+        <div class="[ visually-hidden ][ js-mode-status ]" role="status"></div>
+        <button class="[ toggle-button ] [ js-mode-toggle ]">
+            <span class="[ toggle-button__text ] [ js-mode-toggle-text ]">Tmavý režim</span>
+            <span aria-hidden="true" class="toggle-button__icon"></span>
+        </button>
+    </div>
+    <script charset="UTF-8" src="darkMode.js" type="text/javascript"></script>
+</header>
+<p>
+<form>
+    <input onClick="clean();" type="button" value="Kreslit znovu">
+    <input onClick="zvysitStupen();" type="button" value="Zvýšit stupeň">
+</form>
+<div class='jxgbox' id='jxgbox' style='width:400px; height:400px;'></div>
+
+<script type='text/javascript'>
+    //ZAPNUTÍ A VYPNUTÍ TESTOVACÍHCH BODŮ
+    var test = false;
+    var p = [], l = [];
+    var poleSouradnic = [];
+    var c;
+    var poradiBodu = 0;
+    var getMouseCoords = function (e, i) {
+            var cPos = board.getCoordsTopLeftCorner(e, i),
+                absPos = JXG.getPosition(e, i),
+                dx = absPos[0] - cPos[0],
+                dy = absPos[1] - cPos[1];
+
+            return new JXG.Coords(JXG.COORDS_BY_SCREEN, [dx, dy], board);
+        },
+        down = function (e) {
+            var canCreate, i, coords, el;
+
+            if (p.length < 4) {
+                canCreate = true;
+            } else {
+                canCreate = false;
+            }
+
+            if (e[JXG.touchProperty]) {
+                // index of the finger that is used to extract the coordinates
+                i = 0;
+            }
+            coords = getMouseCoords(e, i);
+
+            for (el in board.objects) {
+                if (JXG.isPoint(board.objects[el]) && board.objects[el].hasPoint(coords.scrCoords[1], coords.scrCoords[2])) {
+                    canCreate = false;
+                    break;
+                }
+            }
+
+            if (canCreate) {
+                //TESTOVACÍ BODY NEBO BOD KLIKNUTÍM
+                if (test) {
+                    p.push(board.create('point', [-3, 3]));
+                    p.push(board.create('point', [-3, -3]));
+                    l.push(board.create('segment', [p[0], p[1]], {strokeOpacity: 0.5}));
+                    p.push(board.create('point', [3, -3]));
+                    l.push(board.create('segment', [p[1], p[2]], {strokeOpacity: 0.5}));
+                    p.push(board.create('point', [3, 3]));
+                    l.push(board.create('segment', [p[2], p[3]], {strokeOpacity: 0.5}));
+                } else {
+                    poleSouradnic.push([coords.usrCoords[1], coords.usrCoords[2]]);
+                    p.push(board.create('point', [coords.usrCoords[1], coords.usrCoords[2]], {name: 'P_{' + (poradiBodu) + '}'}));
+                    poradiBodu++;
+                    if (p.length > 1) {
+                        l.push(board.create('segment', [p[(p.length - 2)], p[p.length - 1]], {strokeOpacity: 0.5}));
+                    }
+                }
+                if (p.length !== 0 && (p.length % 4) === 0) {
+                    c = board.create('curve', JXG.Math.Numerics.bezier(p),
+                        {strokecolor: 'blue', strokeOpacity: 0.6, strokeWidth: 5});
+                }
+            }
+        },
+        board = JXG.JSXGraph.initBoard('jxgbox', {
+            boundingbox: [-5, 5, 5, -5], keepaspectratio: true,
+            showCopyright: false, axis: true
+        });
+    board.on('down', down);
+
+    var clean = function () {
+        board.suspendUpdate();
+        var i = p.length;
+        while (i >= 0) {
+            board.removeObject(p[p.length - i]);
+            i--;
+        }
+        board.removeObject(c);
+        p = [];
+        poradiBodu = 0;
+        board.unsuspendUpdate();
+    };
+
+    var zvysitStupen = function () {
+        if (p.length >= 4) {
+            board.suspendUpdate();
+            board.removeObject(p);
+            board.removeObject(l);
+            var q = [];
+            q.push(board.create('point', [p[0].X(), p[0].Y()], {fixed: true, name: 'P_0'}));
+            for (var i = 0; i < p.length - 1; i++) {
+                var t = 1 - ((i + 1) / p.length);
+
+                var vzdalenost_x = p[i + 1].X() - p[i].X();
+                var vzdalenost_y = p[i].Y() - p[i + 1].Y();
+
+                var pos_x = p[i].X() + vzdalenost_x * t;
+                var pos_y = p[i].Y() - vzdalenost_y * t;
+
+                q.push(board.create('point', [pos_x, pos_y], {fixed: true, name: 'P_{' + (i + 1) + '}'}));
+                l.push(board.create('segment', [q[q.length - 2], q[q.length - 1]], {strokeOpacity: 0.5}));
+            }
+            q.push(board.create('point', [p[p.length - 1].X(), p[p.length - 1].Y()], {
+                fixed: true,
+                name: 'P_{' + (i + 1) + '}'
+            }));
+            l.push(board.create('segment', [q[q.length - 2], q[q.length - 1]], {strokeOpacity: 0.5}));
+
+            p = [];
+            p = q.slice();
+            board.unsuspendUpdate();
+        }
+    };
+</script>
+</p>
+</body>
+</html>

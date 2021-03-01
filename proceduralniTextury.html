@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="cs-cz">
+<head>
+    <meta charset="UTF-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>Generování procedurálních textur</title>
+    <link href="darkModeStyle.css" rel="stylesheet" type="text/css"/>
+    <link href="appletStyle.css" rel="stylesheet" type="text/css"/>
+    <style>
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            flex-direction: row;
+        }
+
+        .containerOvladani {
+            display: flex;
+            flex-wrap: wrap;
+            flex-direction: column;
+        }
+
+        .containerKlikaci {
+            display: flex;
+            flex-wrap: wrap;
+            flex-direction: row;
+        }
+
+        .boxTextury {
+            padding-right: 5px;
+            padding-bottom: 5px;
+            min-width: 150px;
+            flex-grow: 1;
+        }
+
+        .boxOvladani {
+            padding-right: 5px;
+            padding-bottom: 5px;
+            min-width: 150px;
+            flex-grow: 1;
+        }
+
+        .code {
+            font-family: monospace;
+        }
+
+        .boxCode {
+
+            padding-right: 5px;
+            padding-bottom: 5px;
+            min-width: 450px;
+            flex-grow: 1;
+        }
+
+        .boxCodeUsed {
+            padding-right: 5px;
+            padding-bottom: 5px;
+            flex-grow: 1;
+        }
+
+        .boxCanvas {
+            padding-right: 5px;
+            padding-bottom: 5px;
+            max-width: fit-content;
+        }
+
+        .slider {
+            scroll-behavior: smooth;
+        }
+    </style>
+</head>
+<body>
+<header>
+    <div class="header1"><h1>Generování procedurálních textur</h1></div>
+    <div class="user-toggle">
+        <div class="[ visually-hidden ][ js-mode-status ]" role="status"></div>
+        <button class="[ toggle-button ] [ js-mode-toggle ]">
+            <span class="[ toggle-button__text ] [ js-mode-toggle-text ]">Tmavý režim</span>
+            <span aria-hidden="true" class="toggle-button__icon"></span>
+        </button>
+    </div>
+    <script charset="UTF-8" src="darkMode.js" type="text/javascript"></script>
+</header>
+<div class="container">
+    <div class="containerOvladani">
+        <div class="containerKlikaci">
+            <div class="boxTextury">
+                <b>Výběr textury</b><br>
+                <form class="textura">
+                    <input checked id="textura1" name="textura" type="radio"/>
+                    <label for="textura1">Perlinův šum</label><br>
+                    <input id="textura2" name="textura" type="radio"/>
+                    <label for="textura2">Turbulence</label><br>
+                    <input id="textura3" name="textura" type="radio"/>
+                    <label for="textura3">Mramor</label><br>
+                    <input id="textura4" name="textura" type="radio"/>
+                    <label for="textura4">Dřevo</label><br>
+                    <input id="textura5" name="textura" type="radio"/>
+                    <label for="textura5">Mraky</label>
+                </form>
+            </div>
+            <div class="boxOvladani">
+                <b>Ovládací panel</b><br>
+                <form class="parametry">
+                    <div id="slider1LabelDiv"><label for="slider1" id="slider1Label">Mění se dle textury</label><br>
+                    </div>
+                    <div id="slider1Div"><input class="slider" disabled id="slider1" type="range"><br></div>
+                    <div id="slider2LabelDiv"><label for="slider2" id="slider2Label"></label><br></div>
+                    <div id="slider2Div"><input class="slider" disabled id="slider2" type="range"><br></div>
+                    <div id="slider3LabelDiv"><label for="slider3" id="slider3Label"></label><br></div>
+                    <div id="slider3Div"><input class="slider" disabled id="slider3" type="range"><br></div>
+                    <div id="slider4LabelDiv"><label for="slider4" id="slider4Label"></label><br></div>
+                    <div id="slider4Div"><input class="slider" disabled id="slider4" type="range"><br></div>
+                    <div id="slider5LabelDiv"><label for="slider5" id="slider5Label"></label><br></div>
+                    <div id="slider5Div"><input class="slider" disabled id="slider5" type="range"><br></div>
+                </form>
+            </div>
+        </div>
+        <div class="boxCode">
+            <b>Kód pro vykreslení textury</b>
+            <div class="code" id="code">/* Vyber texturu */</div>
+        </div>
+    </div>
+    <div class="boxCanvas">
+        <canvas class="canvas" height="450" id="myCanvas" style="border:1px solid" width="450"></canvas>
+    </div>
+    <div class="boxCodeUsed">
+        <b>Výpis funkcí použitých v kódu</b>
+        <div class="code" id="usedCode">/* Použité funkce */</div>
+    </div>
+</div>
+<script type='text/javascript'>
+    // Vychází z kódu "A canvas demo by Kas Thomas. http://asserttrue.blogspot.com/2012/01/turbulence-in-html5-canvas.html"
+
+    canvas = document.getElementById("myCanvas");
+    context = canvas.getContext("2d");
+
+    function drawViaCallback() {
+
+        let w = canvas.width;
+        let h = canvas.height;
+
+        let canvasData = context.getImageData(0, 0, w, h);
+
+        for (let idx, x = 0; x < w; x++) {
+            for (let y = 0; y < h; y++) {
+                // Index pixelu v poli
+                idx = (x + y * w) * 4;
+                // Hodnoty RGB
+                let r = canvasData.data[idx + 0];
+                let g = canvasData.data[idx + 1];
+                let b = canvasData.data[idx + 2];
+
+                let pixel = callback([r, g, b], x, y, w, h);
+
+                canvasData.data[idx + 0] = pixel[0];
+                canvasData.data[idx + 1] = pixel[1];
+                canvasData.data[idx + 2] = pixel[2];
+            }
+        }
+        context.putImageData(canvasData, 0, 0);
+    }
+
+    function fillCanvas(color) {
+
+        context.fillStyle = color;
+        context.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    function doPixelLoop(code) {
+        let f = "callback = function( pixel,x,y,w,h )" +
+            " { r=pixel[0];g=pixel[1];b=pixel[2];" +
+            code + " return [r,g,b]; }";
+
+        try {
+            eval(f);
+            fillCanvas("#FFFFFF");
+            drawViaCallback();
+        } catch (e) {
+            alert("Error: " + e.toString());
+        }
+    }
+
+    // Port Java kódu Kena Perlina
+    PerlinNoise = new function () {
+
+        let p = new Array(512);
+        let permutation = [151, 160, 137, 91, 90, 15,
+            131, 13, 201, 95, 96, 53, 194, 233, 7, 225, 140, 36, 103, 30, 69, 142, 8, 99, 37, 240, 21, 10, 23,
+            190, 6, 148, 247, 120, 234, 75, 0, 26, 197, 62, 94, 252, 219, 203, 117, 35, 11, 32, 57, 177, 33,
+            88, 237, 149, 56, 87, 174, 20, 125, 136, 171, 168, 68, 175, 74, 165, 71, 134, 139, 48, 27, 166,
+            77, 146, 158, 231, 83, 111, 229, 122, 60, 211, 133, 230, 220, 105, 92, 41, 55, 46, 245, 40, 244,
+            102, 143, 54, 65, 25, 63, 161, 1, 216, 80, 73, 209, 76, 132, 187, 208, 89, 18, 169, 200, 196,
+            135, 130, 116, 188, 159, 86, 164, 100, 109, 198, 173, 186, 3, 64, 52, 217, 226, 250, 124, 123,
+            5, 202, 38, 147, 118, 126, 255, 82, 85, 212, 207, 206, 59, 227, 47, 16, 58, 17, 182, 189, 28, 42,
+            223, 183, 170, 213, 119, 248, 152, 2, 44, 154, 163, 70, 221, 153, 101, 155, 167, 43, 172, 9,
+            129, 22, 39, 253, 19, 98, 108, 110, 79, 113, 224, 232, 178, 185, 112, 104, 218, 246, 97, 228,
+            251, 34, 242, 193, 238, 210, 144, 12, 191, 179, 162, 241, 81, 51, 145, 235, 249, 14, 239, 107,
+            49, 192, 214, 31, 181, 199, 106, 157, 184, 84, 204, 176, 115, 121, 50, 45, 127, 4, 150, 254,
+            138, 236, 205, 93, 222, 114, 67, 29, 24, 72, 243, 141, 128, 195, 78, 66, 215, 61, 156, 180
+        ];
+        for (let i = 0; i < 256; i++)
+            p[256 + i] = p[i] = permutation[i];
+
+        this.noise = function (x, y, z) {
+
+            let X = Math.floor(x) & 255, // Najdi jednotkovou krychli, která obsahuje bod
+                Y = Math.floor(y) & 255,
+                Z = Math.floor(z) & 255;
+            x -= Math.floor(x);  // Najdi relativní X, Y, Z bodu v krychli
+            y -= Math.floor(y);
+            z -= Math.floor(z);
+            let u = this.fade(x), // Vypočti relativní křivky slábnutí pro každý z X, Y, Z
+                v = this.fade(y),
+                w = this.fade(z);
+            let A = p[X] + Y, AA = p[A] + Z, AB = p[A + 1] + Z,      // Hašuj souřadnice osmi rohů krychle
+                B = p[X + 1] + Y, BA = p[B] + Z, BB = p[B + 1] + Z;
+
+            return this.scale(this.lerp(w, this.lerp(v, this.lerp(u, this.grad(p[AA], x, y, z),  // a přidej
+                this.grad(p[BA], x - 1, y, z)), // smíchané
+                this.lerp(u, this.grad(p[AB], x, y - 1, z),  // výsledky
+                    this.grad(p[BB], x - 1, y - 1, z))),// z osmi
+                this.lerp(v, this.lerp(u, this.grad(p[AA + 1], x, y, z - 1),  // rohů
+                    this.grad(p[BA + 1], x - 1, y, z - 1)), // krychle
+                    this.lerp(u, this.grad(p[AB + 1], x, y - 1, z - 1),
+                        this.grad(p[BB + 1], x - 1, y - 1, z - 1)))));
+        };
+
+        this.fade = function (t) {
+            return t * t * t * (t * (t * 6 - 15) + 10);
+        }
+
+        this.lerp = function (t, a, b) {
+            return a + t * (b - a);
+        }
+
+        this.grad = function (hash, x, y, z) {
+            let h = hash & 15;          // Konvertuj 4 bity hash kódu na 12 gradientních vektorů
+            let u = h < 8 ? x : y,
+                v = h < 4 ? y : h === 12 || h === 14 ? x : z;
+            return ((h & 1) === 0 ? u : -u) + ((h & 2) === 0 ? v : -v);
+        }
+
+        this.scale = function (n) {
+            return (1 + n) / 2;
+        }
+    };
+
+    function turbulence(x, y, z, octaves) {
+
+        let t = 0;
+        let f = 1;
+        let n = 0;
+
+        for (let i = 0; i < octaves; i++, f *= 2) {
+            n += PerlinNoise.noise(x * f, y * f, z) / f;
+            t += 1 / f;
+        }
+        return n / t;  // Přepočítej zpět na rozsah {0,1}
+    }
+
+    function snoise(x, y, z, persistence, octaves) {
+
+        let t = 0;
+        let f = 1;
+        let n = 0;
+
+        for (let i = 0; i < octaves; i++, f *= 2) {
+            n += Math.pow(persistence, i) * PerlinNoise.noise(x * f, y * f, z) / f;
+            t += 1 / f;
+        }
+        return n / t;  // Přepočítej zpět na rozsah {0,1}
+    }
+
+    function ramp(x) { // Rampa
+        return (1 / 2) * (1 + Math.sin(x));
+    }
+
+    function marble(x, y, z, persistence, octaves, influence) { // Mramor
+        return ramp(influence * snoise(x, y, z, persistence, octaves));
+    }
+
+    function bias(a, b) { // Perlinova funkce zkreslení
+        return Math.pow(a, Math.log(b) / Math.log(0.5));
+    }
+
+    const slider1 = document.getElementById("slider1");
+    const slider2 = document.getElementById("slider2");
+    displaySlider(slider2, false);
+    const slider3 = document.getElementById("slider3");
+    displaySlider(slider3, false);
+    const slider4 = document.getElementById("slider4");
+    displaySlider(slider4, false);
+    const slider5 = document.getElementById("slider5");
+    displaySlider(slider5, false);
+
+    function displaySlider(slider, display) {
+
+        let label = getLabelID(slider);
+        let sliderDiv = document.getElementById(slider.id + "Div");
+        let labelDiv = document.getElementById(slider.id + "LabelDiv");
+
+        if (display === undefined) {
+            slider.style.display = "inline";
+            sliderDiv.style.display = "inline";
+            label.style.display = "inline";
+            labelDiv.style.display = "inline";
+        } else if (display) {
+            slider.style.display = "inline";
+            sliderDiv.style.display = "inline";
+            label.style.display = "inline";
+            labelDiv.style.display = "inline";
+        } else {
+            slider.style.display = "none";
+            sliderDiv.style.display = "none";
+            label.style.display = "none";
+            labelDiv.style.display = "none";
+        }
+    }
+
+    function setSlider(slider, min, max, step, value, labelText, color, display) {
+        let label = getLabelID(slider);
+
+        if (color === undefined) {
+            color = "black";
+        }
+
+        slider.removeAttribute("disabled");
+        slider.min = min;
+        slider.max = max;
+        slider.step = step;
+        slider.defaultValue = value;
+        slider.value = value;
+        slider.color = color;
+        setSliderTitle(slider);
+        label.style.color = color;
+        label.innerText = labelText;
+
+        displaySlider(slider, display)
+    }
+
+    function setChosenTexture() {
+        for (let i = 0, length = selectElement.length; i < length; i++) {
+            if (selectElement[i].checked) {
+                switch (i) {
+                    case 0:
+                        texture1Set();
+                        break;
+                    case 1:
+                        texture2Set();
+                        break;
+                    case 2:
+                        texture3Set();
+                        break;
+                    case 3:
+                        texture4Set();
+                        break;
+                    case 4:
+                        texture5Set();
+                        break;
+                }
+                break;
+            }
+        }
+    }
+
+    function drawChosenTexture() {
+        for (let i = 0, length = selectElement.length; i < length; i++) {
+            if (selectElement[i].checked) {
+                switch (i) {
+                    case 0:
+                        texture1Draw();
+                        break;
+                    case 1:
+                        texture2Draw();
+                        break;
+                    case 2:
+                        texture3Draw();
+                        break;
+                    case 3:
+                        texture4Draw();
+                        break;
+                    case 4:
+                        texture5Draw();
+                        break;
+                }
+                break;
+            }
+        }
+    }
+
+    function replaceAll(str, find, replace) {
+        return str.replace(new RegExp(find, 'g'), replace);
+    }
+
+    function getLabelID(slider) {
+        return document.getElementById(slider.id + "Label");
+    }
+
+    function getSliderlColor(slider) {
+        let label = getLabelID(slider);
+        return label.style.color;
+    }
+
+    function setSliderTitle(slider) {
+        slider.setAttribute("title", "aktuálně: " + slider.value + ", výchozí: " + slider.defaultValue);
+    }
+
+    function extractCodeCanvas(kod) {
+        kod = replaceAll(kod, "\n", "<br>");
+        kod = replaceAll(kod, "slider1", "<span style='color:" + getSliderlColor(slider1) + "'>" + slider1.value + "</span>");
+        kod = replaceAll(kod, "slider2", "<span style='color:" + getSliderlColor(slider2) + "'>" + slider2.value + "</span>");
+        kod = replaceAll(kod, "slider3", "<span style='color:" + getSliderlColor(slider3) + "'>" + slider3.value + "</span>");
+        kod = replaceAll(kod, "slider4", "<span style='color:" + getSliderlColor(slider4) + "'>" + slider4.value + "</span>");
+        kod = replaceAll(kod, "slider5", "<span style='color:" + getSliderlColor(slider5) + "'>" + slider5.value + "</span>");
+        document.getElementById('code').innerHTML = kod;
+    }
+
+    function drawCodeCanvas(kod) {
+        kod = replaceAll(kod, "slider1", slider1.value);
+        kod = replaceAll(kod, "slider2", slider2.value);
+        kod = replaceAll(kod, "slider3", slider3.value);
+        kod = replaceAll(kod, "slider4", slider4.value);
+        kod = replaceAll(kod, "slider5", slider5.value);
+        doPixelLoop(kod);
+    }
+
+    function extractUsedCode(pouzityKod) {
+        pouzityKod = replaceAll(pouzityKod, "\n", "<br>");
+        document.getElementById('usedCode').innerHTML = pouzityKod;
+    }
+
+    function texture1Set() {
+        setSlider(slider1, 0, 100, 1, 50, "Velikost", "orange");
+        setSlider(slider2, 0, 1, .1, .5, "Osa X", "red");
+        setSlider(slider3, 0, 1, .1, .5, "Osa Y", "green");
+        setSlider(slider4, 0, 1, .1, .5, "Osa Z", "blue");
+        displaySlider(slider5, false);
+        extractUsedCode("PerlinNoise.noise = " + replaceAll(PerlinNoise.noise.toString(), "this.", "")
+            + "<hr>fade = " + PerlinNoise.fade.toString()
+            + "<hr>scale = " + PerlinNoise.scale.toString()
+            + "<hr>lerp = " + PerlinNoise.lerp.toString()
+            + "<hr>grad = " + PerlinNoise.grad.toString());
+    }
+
+    function texture1Draw() {
+        const kod = "x /= w;\n" +
+            "y /= h;\n" +
+            "n = PerlinNoise.noise(slider1 * x * slider2, slider1 * y * slider3, slider4);\n" +
+            "r = g = b = 255 * n;";
+
+        extractCodeCanvas(kod);
+        drawCodeCanvas(kod);
+    }
+
+    function texture2Set() {
+        setSlider(slider1, 1, 100, 1, 50, "Velikost", "orange");
+        setSlider(slider2, 0, 1, .1, .5, "Osa X", "red");
+        setSlider(slider3, 0, 1, .1, .5, "Osa Y", "green");
+        setSlider(slider4, 0, 1, .1, .5, "Osa Z", "blue");
+        setSlider(slider5, 1, 10, 1, 5, "Počet oktáv", "violet");
+        extractUsedCode(turbulence.toString()
+            + "<hr>PerlinNoise.noise = " + replaceAll(PerlinNoise.noise.toString(), "this.", "")
+            + "<hr>fade = " + PerlinNoise.fade.toString()
+            + "<hr>scale = " + PerlinNoise.scale.toString()
+            + "<hr>lerp = " + PerlinNoise.lerp.toString()
+            + "<hr>grad = " + PerlinNoise.grad.toString());
+    }
+
+
+    function texture2Draw() {
+        const kod = "x /= w;\n " +
+            "y /= h;\n" +
+            "n = turbulence(slider1*x*slider2,slider1*y*slider3,slider4,slider5);\n" +
+            "r = g = b = 255 * n;";
+
+        extractCodeCanvas(kod);
+        drawCodeCanvas(kod);
+    }
+
+    function texture3Set() {
+        setSlider(slider1, 1, 100, 1, 10, "Velikost", "orange");
+        setSlider(slider2, 0, 1, .1, .9, "Persistence", "red");
+        setSlider(slider3, 1, 10, 1, 7, "Počet oktáv", "green");
+        setSlider(slider4, 0, 1, .1, .6, "Osa Z", "blue");
+        setSlider(slider5, 1, 100, 1, 44, "Síla vlivu", "violet");
+        extractUsedCode(marble.toString() + "<hr>"
+            + ramp.toString()
+            + "<hr>" + snoise.toString()
+            + "<hr>PerlinNoise.noise = " + replaceAll(PerlinNoise.noise.toString(), "this.", "")
+            + "<hr>fade = " + PerlinNoise.fade.toString()
+            + "<hr>scale = " + PerlinNoise.scale.toString()
+            + "<hr>lerp = " + PerlinNoise.lerp.toString()
+            + "<hr>grad = " + PerlinNoise.grad.toString());
+    }
+
+    function texture3Draw() {
+        const kod = "x /= w;\n" +
+            "y /= h;\n" +
+            "n = marble(slider1 * x, slider1 * y, slider4, slider2, slider3, slider5);\n" +
+            "r = g = b = 255 * n;";
+
+        extractCodeCanvas(kod);
+        drawCodeCanvas(kod);
+    }
+
+    function texture4Set() {
+        setSlider(slider1, 0.1, 10, .1, 1, "Velikost", "orange");
+        setSlider(slider2, 1, 1000, 1, 89, "Roztažení osy X", "red");
+        setSlider(slider3, 1, 1000, 1, 800, "Roztažení osy Y", "green");
+        setSlider(slider4, 0, 1, .01, .74, "Osa Z", "blue");
+        setSlider(slider5, 1, 1000, 1, 48, "Jemnost textury", "violet");
+        extractUsedCode("PerlinNoise.noise = " + replaceAll(PerlinNoise.noise.toString(), "this.", "")
+            + "<hr>fade = " + PerlinNoise.fade.toString()
+            + "<hr>scale = " + PerlinNoise.scale.toString()
+            + "<hr>lerp = " + PerlinNoise.lerp.toString()
+            + "<hr>grad = " + PerlinNoise.grad.toString());
+    }
+
+    function texture4Draw() {
+        const kod = "n = PerlinNoise.noise(slider1*x/slider2,slider1*y/slider3, slider4);\n" +
+            "n = Math.cos(n*slider5);\n" +
+            "base = Math.abs(Math.round(n * 255)); // Základ\n" +
+            "r = base + 54;\n" +
+            "b = base - 108;\n" +
+            "g = base - 23;";
+
+        extractCodeCanvas(kod);
+        drawCodeCanvas(kod);
+    }
+
+    function texture5Set() {
+        setSlider(slider1, 1, 100, 1, 5, "Velikost", "orange");
+        setSlider(slider2, 0, 1, .1, .4, "Rozprostření mraků", "red");
+        setSlider(slider3, 1, 5, 0.1, 1.8, "Roztažení osy Y", "green");
+        setSlider(slider4, 1, 5, 1, 3, "Počet oktáv", "blue");
+        setSlider(slider5, 0.1, 5, .01, 0.9, "Nastavení zelené", "violet");
+        extractUsedCode(turbulence.toString() + "<hr>"
+            + bias.toString() + "<hr>"
+            + "PerlinNoise.noise = " + replaceAll(PerlinNoise.noise.toString(), "this.", "")
+            + "<hr>fade = " + PerlinNoise.fade.toString()
+            + "<hr>scale = " + PerlinNoise.scale.toString()
+            + "<hr>lerp = " + PerlinNoise.lerp.toString()
+            + "<hr>grad = " + PerlinNoise.grad.toString());
+    }
+
+    function texture5Draw() {
+        const kod = "x /= w;\n" +
+            "y /= h;\n" +
+            "y = 1 - bias(y,slider2);\n" +
+            "n = turbulence(slider1*x,slider3*slider1*y,1-y,slider4);\n" +
+            "y = Math.sqrt(y);\n" +
+            "r = bias(y,.68) * n * 255; \n" +
+            "g = r/slider5;\n" +
+            "b = 255 - r/2;";
+
+        extractCodeCanvas(kod);
+        drawCodeCanvas(kod);
+    }
+
+    const selectElement = document.querySelector('.textura');
+    selectElement.addEventListener('change', (event) => {
+        setChosenTexture();
+        drawChosenTexture();
+    });
+    slider1.addEventListener('change', (event) => {
+        drawChosenTexture();
+        setSliderTitle(slider1);
+    });
+    slider2.addEventListener('change', (event) => {
+        drawChosenTexture();
+        setSliderTitle(slider2);
+    });
+    slider3.addEventListener('change', (event) => {
+        drawChosenTexture();
+        setSliderTitle(slider3);
+    });
+    slider4.addEventListener('change', (event) => {
+        drawChosenTexture();
+        setSliderTitle(slider4);
+    });
+    slider5.addEventListener('change', (event) => {
+        drawChosenTexture();
+        setSliderTitle(slider5);
+    });
+
+    var event = document.createEvent('Event');
+    event.initEvent('change', true, true);
+    selectElement.dispatchEvent(event);
+</script>
+</body>
+
+</html>

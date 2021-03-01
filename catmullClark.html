@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="cs-cz">
+<head>
+    <meta charset="UTF-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>Catmull-Clark subdivision</title>
+    <script charset="UTF-8" src="jsxgraphcore.js" type="text/javascript"></script>
+    <link href="jsxgraph.css" rel="stylesheet" type="text/css"/>
+    <link href="darkModeStyle.css" rel="stylesheet" type="text/css"/>
+    <link href="appletStyle.css" rel="stylesheet" type="text/css"/>
+</head>
+<body>
+<header>
+    <div class="header1"><h1>Catmull-Clark subdivision</h1></div>
+    <div class="user-toggle">
+        <div class="[ visually-hidden ][ js-mode-status ]" role="status"></div>
+        <button class="[ toggle-button ] [ js-mode-toggle ]">
+            <span class="[ toggle-button__text ] [ js-mode-toggle-text ]">Tmavý režim</span>
+            <span aria-hidden="true" class="toggle-button__icon"></span>
+        </button>
+    </div>
+    <script charset="UTF-8" src="darkMode.js" type="text/javascript"></script>
+</header>
+<p>
+<div class='jxgbox' id='jxgbox1' style='float: left; width:300px; height:300px;'></div>
+<div class='jxgbox' id='jxgbox2' style='float: left; width:300px; height:300px;'></div>
+<div class='jxgbox' id='jxgbox3' style='float: left; width:300px; height:300px;'></div>
+<div class='jxgbox' id='jxgbox4' style='float: left; width:300px; height:300px;'></div>
+<script type='text/javascript'>
+    var velZarovnani = 4;
+    var zarovnani = [-velZarovnani, velZarovnani, velZarovnani, -velZarovnani]
+    var board = JXG.JSXGraph.initBoard('jxgbox1', {
+        boundingbox: zarovnani,
+        showNavigation: false,
+        showCopyright: false,
+        keepaspectratio: true,
+        zoom: {enabled: false},
+        pan: {enabled: false},
+        axis: true,
+        width: 700,
+        height: 400
+    });
+    var board2 = JXG.JSXGraph.initBoard('jxgbox2', {
+        boundingbox: zarovnani,
+        showNavigation: false,
+        showCopyright: false,
+        keepaspectratio: true,
+        zoom: {enabled: false},
+        pan: {enabled: false},
+        axis: true,
+        width: 700,
+        height: 400
+    });
+    var board3 = JXG.JSXGraph.initBoard('jxgbox3', {
+        boundingbox: zarovnani,
+        showNavigation: false,
+        showCopyright: false,
+        keepaspectratio: true,
+        zoom: {enabled: false},
+        pan: {enabled: false},
+        axis: true,
+        width: 700,
+        height: 400
+    });
+    var board4 = JXG.JSXGraph.initBoard('jxgbox4', {
+        boundingbox: zarovnani,
+        showNavigation: false,
+        showCopyright: false,
+        keepaspectratio: true,
+        zoom: {enabled: false},
+        pan: {enabled: false},
+        axis: true,
+        width: 700,
+        height: 400
+    });
+
+
+    var matice = [
+        [[-3, 3], [3, 3]],
+        [[-3, -3], [3, -3]]
+    ];
+
+    var p = []; //body (points)
+    var p2 = [];
+    var p3 = [];
+    var p4 = [];
+    var l = []; //čáry (lines)
+    var l2 = [];
+    var l3 = [];
+    var l4 = [];
+    var prumerBodu = function (bodA, bodB, bodC, bodD, korekce) {
+        if (korekce) {
+            return [(bodA[0] + bodB[0] + bodC[0] + bodD[0]*korekce) / 4, (bodA[1] + bodB[1] + bodC[1] + bodD[1]*korekce) / 4];
+        } else if (bodD) {
+            return [(bodA[0] + bodB[0] + bodC[0] + bodD[0]) / 4, (bodA[1] + bodB[1] + bodC[1] + bodD[1]) / 4];
+        } else if (bodC) {
+            return [(bodA[0] + bodB[0] + bodC[0]) / 3, (bodA[1] + bodB[1] + bodC[1]) / 3];
+        } else if (bodB) {
+            return [(bodA[0] + bodB[0]) / 2, (bodA[1] + bodB[1]) / 2];
+        } else {
+            return [bodA[0], bodA[1]];
+        }
+    };
+
+    var pocetBodu = function (matice) {
+        var pocitadlo = 0;
+        for (var i = 0; i < matice.length; i++) {
+            pocitadlo = pocitadlo + matice[i].length;
+        }
+        return pocitadlo;
+    };
+
+    var soucetBodu = function (matice) {
+        var soucet = [0, 0];
+        for (var i = 0; i < matice.length; i++) {
+            for (var j = 0; j < matice[i].length; j++) {
+                soucet[0] += matice[i][j][0];
+                soucet[1] += matice[i][j][1];
+            }
+        }
+        return soucet;
+    };
+
+    var prevodPole1D2D = function (matice) {
+        //var vysledek = [[[], []], [[], []]];
+        var vysledek;
+        if (matice.length === 4) {
+            vysledek = [[[], []], [[], []]];
+        }
+        var pocitadlo = 0;
+        for (var i = 0; i < (matice.length / 2); i++) {
+            for (var j = 0; j < (matice.length / 2); j++) {
+                vysledek[i][j] = matice[pocitadlo];
+                pocitadlo++;
+            }
+        }
+        return vysledek;
+    };
+
+    var rozdelMaticiNa4 = function (matice, kterouMatici) {
+        if (matice.length === 3) {
+            switch (kterouMatici) {
+                case 0:
+                    return [[matice[0][0], matice[0][1]], [matice[1][0], matice[1][1]]];
+                case 1:
+                    return [[matice[0][1], matice[0][2]], [matice[1][1], matice[1][2]]];
+                case 2:
+                    return [[matice[1][0], matice[1][1]], [matice[2][0], matice[2][1]]];
+                case 3:
+                    return [[matice[1][1], matice[1][2]], [matice[2][1], matice[2][2]]];
+                default:
+                    return [
+                        [[matice[0][0], matice[0][1]], [matice[1][0], matice[1][1]]],
+                        [[matice[0][1], matice[0][2]], [matice[1][1], matice[1][2]]],
+                        [[matice[1][0], matice[1][1]], [matice[2][0], matice[2][1]]],
+                        [[matice[1][1], matice[1][2]], [matice[2][1], matice[2][2]]]
+                    ];
+            }
+        } else {
+            return [
+                [[matice[0][0], matice[0][1], matice[0][2]], [matice[1][0], matice[1][1], matice[1][2]], [matice[2][0], matice[2][1], matice[2][2]]],
+                [[matice[0][2], matice[0][3], matice[0][4]], [matice[1][2], matice[1][3], matice[1][4]], [matice[2][2], matice[2][3], matice[2][4]]],
+                [[matice[2][0], matice[2][1], matice[2][2]], [matice[3][0], matice[3][1], matice[3][2]], [matice[4][0], matice[4][1], matice[4][2]]],
+                [[matice[2][2], matice[2][3], matice[2][4]], [matice[3][2], matice[3][3], matice[3][4]], [matice[4][2], matice[4][3], matice[4][4]]]
+            ];
+        }
+    };
+
+    var zapisBody = function () {
+        var pocitadlo = 0;
+        for (var i = 0; i < matice.length; i++) {
+            for (var j = 0; j < matice[i].length; j++) {
+                matice[i][j][0] = p[pocitadlo].X();
+                matice[i][j][1] = p[pocitadlo].Y();
+                pocitadlo++;
+            }
+        }
+    };
+
+    var vykresliBody = function (board, matice, p, zamek) {
+        for (var i = 0; i < matice.length; i++) {
+            for (var j = 0; j < matice[i].length; j++) {
+                p.push(board.create('point', [matice[i][j][0], matice[i][j][1]], {
+                    name: '',
+                    fixed: zamek, label: {visible: false}
+                }));
+            }
+        }
+    };
+
+    var smazBody = function (board, p) {
+        board.suspendUpdate();
+        var i = p.length;
+        while (i >= 0) {
+            board.removeObject(p[p.length - i]);
+            i--;
+        }
+        p = [];
+        board.unsuspendUpdate();
+    };
+
+    var vykresliCary = function (board, matice, l) {
+        for (var i = 1; i < matice.length; i++) {
+            for (var j = 1; j < matice[i].length; j++) {
+                l.push(board.create('segment', [[matice[i - 1][j - 1][0], matice[i - 1][j - 1][1]], [matice[i - 1][j][0], matice[i - 1][j][1]]], {
+                    strokeOpacity: 1,
+                    fixed: true
+                }));
+                l.push(board.create('segment', [[matice[i - 1][j - 1][0], matice[i - 1][j - 1][1]], [matice[i][j - 1][0], matice[i][j - 1][1]]], {
+                    strokeOpacity: 1,
+                    fixed: true
+                }));
+                l.push(board.create('segment', [[matice[i][j - 1][0], matice[i][j - 1][1]], [matice[i][j][0], matice[i][j][1]]], {
+                    strokeOpacity: 1,
+                    fixed: true
+                }));
+                l.push(board.create('segment', [[matice[i - 1][j][0], matice[i - 1][j][1]], [matice[i][j][0], matice[i][j][1]]], {
+                    strokeOpacity: 1,
+                    fixed: true
+                }))
+            }
+        }
+    };
+
+    var smazCary = function (board, l) {
+        board.suspendUpdate();
+        var i = l.length;
+        while (i >= 0) {
+            board.removeObject(l[l.length - i]);
+            i--;
+        }
+        l = [];
+        board.unsuspendUpdate();
+    };
+
+    var vypocetF = function (matice) {
+
+        var pocetB = pocetBodu(matice);
+        var soucet = soucetBodu(matice);
+
+        if (matice.length < 3) {
+            // F - vrchol (středový)
+            soucet[0] = (1 / pocetB) * soucet[0];
+            soucet[1] = (1 / pocetB) * soucet[1];
+        } else {
+            var matRozdelena = rozdelMaticiNa4(matice);
+            for (var i = 0; i < matRozdelena.length; i++) {
+                soucet[i] = vypocetF(matRozdelena[i]);
+            }
+            soucet = prevodPole1D2D(soucet);
+        }
+
+        return soucet;
+    };
+
+    var vypocetE = function (matice, fVrchol) {
+        var vysledek = [];
+        vysledek.splice(matice);
+
+        if (matice.length < 3) {
+            var vysledekA = [((matice[0][0][0] + matice[0][1][0]) / 2), ((matice[0][0][1] + matice[0][1][1]) / 2)];
+            var vysledekB = [((matice[0][0][0] + matice[1][0][0]) / 2), ((matice[0][0][1] + matice[1][0][1]) / 2)];
+            var vysledekC = [((matice[0][1][0] + matice[1][1][0]) / 2), ((matice[0][1][1] + matice[1][1][1]) / 2)];
+            var vysledekD = [((matice[1][0][0] + matice[1][1][0]) / 2), ((matice[1][0][1] + matice[1][1][1]) / 2)];
+            vysledek = [[vysledekA, vysledekB], [vysledekC, vysledekD]];
+        } else {
+            var matRozdelena = rozdelMaticiNa4(matice);
+            for (var i = 0; i < matRozdelena.length; i++) {
+                vysledek[i] = vypocetE(matRozdelena[i]);
+            }
+            vysledek = prevodPole1D2D(vysledek);
+        }
+
+        return vysledek;
+    };
+
+    var vypocetV = function (matice, matE, matF) {
+        var pocetBoduMatice = pocetBodu(matice);
+        var n = pocetBoduMatice, q = [], r = [], s = [];
+        // (Q - průměr okolních F bodů)/4 + 2*(R - průměr okolních středových E bodů)/4 + (S - původní vrchol)/4
+        if (pocetBoduMatice === 4) {
+            var vysledekA = [matice[0][0][0] / pocetBoduMatice + 2 * ((matE[0][1][0] + matE[0][0][0]) / 2) / pocetBoduMatice + (matice[0][0][0] * (pocetBoduMatice - 3)) / pocetBoduMatice,
+                matice[0][0][1] / pocetBoduMatice + 2 * ((matE[0][1][1] + matE[0][0][1]) / 2) / pocetBoduMatice + (matice[0][0][1] * (pocetBoduMatice - 3)) / pocetBoduMatice];
+            var vysledekB = [matice[0][1][0] / pocetBoduMatice + 2 * ((matE[0][0][0] + matE[1][0][0]) / 2) / pocetBoduMatice + (matice[0][1][0] * (pocetBoduMatice - 3)) / pocetBoduMatice,
+                matice[0][1][1] / pocetBoduMatice + 2 * ((matE[0][0][1] + matE[1][0][1]) / 2) / pocetBoduMatice + (matice[0][1][1] * (pocetBoduMatice - 3)) / pocetBoduMatice];
+            var vysledekC = [matice[1][0][0] / pocetBoduMatice + 2 * ((matE[0][1][0] + matE[1][1][0]) / 2) / pocetBoduMatice + (matice[1][0][0] * (pocetBoduMatice - 3)) / pocetBoduMatice,
+                matice[1][0][1] / pocetBoduMatice + 2 * ((matE[0][1][1] + matE[1][1][1]) / 2) / pocetBoduMatice + (matice[1][0][1] * (pocetBoduMatice - 3)) / pocetBoduMatice];
+            var vysledekD = [matice[1][1][0] / pocetBoduMatice + 2 * ((matE[1][0][0] + matE[1][1][0]) / 2) / pocetBoduMatice + (matice[1][1][0] * (pocetBoduMatice - 3)) / pocetBoduMatice,
+                matice[1][1][1] / pocetBoduMatice + 2 * ((matE[1][0][1] + matE[1][1][1]) / 2) / pocetBoduMatice + (matice[1][1][1] * (pocetBoduMatice - 3)) / pocetBoduMatice];
+            return [[vysledekA, vysledekB],
+                [vysledekC, vysledekD]];
+        }
+    };
+
+    var provedSubdivision = function (matice) {
+        var fVrchol = vypocetF(matice);
+        var eVrchol = vypocetE(matice, fVrchol);
+        var vVrchol = vypocetV(matice, eVrchol, fVrchol);
+
+        return [[vVrchol[0][0], eVrchol[0][0], vVrchol[0][1]],
+            [eVrchol[0][1], fVrchol, eVrchol[1][0]],
+            [vVrchol[1][0], eVrchol[1][1], vVrchol[1][1]]];
+    };
+
+    var provedSubdivision2 = function (matice) {
+        var fVrchol = vypocetF(matice);
+        var eVrchol = vypocetE(matice, fVrchol);
+        var rozdelenaMatice = rozdelMaticiNa4(matice);
+        var prevedenaMatice = prevodPole1D2D(rozdelenaMatice);
+        var vVrchol = [[], []];
+        for (var i = 0; i < (matice.length / 2); i++) {
+            for (var j = 0; j < (matice.length / 2); j++) {
+                vVrchol[i][j] = vypocetV(prevedenaMatice[i][j], eVrchol[i][j], fVrchol[i][j]);//???
+
+            }
+        }
+
+        var vyslednaMatice = [
+            [vVrchol[0][0][0][0], eVrchol[0][0][0][0], prumerBodu(vVrchol[0][0][0][1], vVrchol[0][1][0][0], matice[0][1], matice[0][1]), eVrchol[0][1][0][0], vVrchol[0][1][0][1]],
+            [eVrchol[0][0][0][1], fVrchol[0][0], eVrchol[0][0][1][0], fVrchol[0][1], eVrchol[0][1][1][0]],
+            [prumerBodu(vVrchol[0][0][1][0], vVrchol[1][0][0][0], matice[1][0], matice[1][0]), eVrchol[0][0][1][1], matice[1][1], eVrchol[0][1][1][1], prumerBodu(vVrchol[0][1][1][1], vVrchol[1][1][0][1], matice[1][2], matice[1][2])],
+            [eVrchol[1][0][0][1], fVrchol[1][0], eVrchol[1][0][1][0], fVrchol[1][1], eVrchol[1][1][1][0]],
+            [vVrchol[1][0][1][0], eVrchol[1][0][1][1], prumerBodu(vVrchol[1][0][1][1], vVrchol[1][1][1][0], matice[2][1], matice[2][1]), eVrchol[1][1][1][1], vVrchol[1][1][1][1]]
+        ];
+
+        return vyslednaMatice;
+    };
+
+    var provedSubdivision3 = function (matice) {
+        var rozdelenaMatice = rozdelMaticiNa4(matice);
+        var fVrchol = [];
+        var eVrchol = [];
+        var vCM = [];
+        for (var i = 0; i < rozdelenaMatice.length; i++) {
+            fVrchol[i] = vypocetF(rozdelenaMatice[i]);
+            eVrchol[i] = vypocetE(rozdelenaMatice[i], fVrchol[i]);
+            vCM[i] = provedSubdivision2(rozdelenaMatice[i]);
+        }
+
+        var vyslednaMatice = [];
+        for (var i = 0; i < 10; i++) {
+            if (i < 5) {
+                vyslednaMatice[i] = vCM[0][i].concat(vCM[1][i]);
+            } else {
+                vyslednaMatice[i] = vCM[2][i - 5].concat(vCM[3][i - 5]);
+            }
+        }
+
+        var stred = prumerBodu(vyslednaMatice[4][4], vyslednaMatice[4][5], vyslednaMatice[5][4], vyslednaMatice[5][5]);
+        var vrch = prumerBodu(vyslednaMatice[0][4], vyslednaMatice[0][5], matice[0][2], matice[0][2], 1.1);
+        var leva = prumerBodu(vyslednaMatice[4][0], vyslednaMatice[5][0], matice[2][0], matice[2][0], 1.1);
+        var prava = prumerBodu(vyslednaMatice[4][9], vyslednaMatice[5][9], matice[2][4], matice[2][4], 1.1);
+        var spodek = prumerBodu(vyslednaMatice[9][4], vyslednaMatice[9][5], matice[4][2], matice[4][2], 1.1);
+
+        for (var i = 0; i < 10; i++) {
+            vyslednaMatice[i][4] = prumerBodu(vyslednaMatice[i][4], vyslednaMatice[i][5]);
+            vyslednaMatice[4][i] = prumerBodu(vyslednaMatice[4][i], vyslednaMatice[5][i]);
+        }
+
+        for (var i = 0; i < 10; i++) {
+            vyslednaMatice[i].splice(5, 1);
+        }
+
+        vyslednaMatice.splice(5, 1);
+
+        vyslednaMatice[4][4] = stred;
+        vyslednaMatice[0][4] = vrch;
+        vyslednaMatice[4][0] = leva;
+        vyslednaMatice[4][8] = prava;
+        vyslednaMatice[8][4] = spodek;
+
+
+        return vyslednaMatice;
+    };
+
+    var provedHlavni = function (){
+        vykresliCary(board, matice, l);
+        var mat2 = provedSubdivision(matice);
+        vykresliBody(board2, mat2, p2, true);
+        vykresliCary(board2, mat2, l2);
+        var mat3 = provedSubdivision2(mat2);
+        vykresliBody(board3, mat3, p3, true);
+        vykresliCary(board3, mat3, l3);
+        var mat4 = provedSubdivision3(mat3);
+        vykresliBody(board4, mat4, p4, true);
+        vykresliCary(board4, mat4, l4);
+    };
+
+    var smazHlavni = function (){
+        smazCary(board, l);
+        smazCary(board2, l2);
+        smazBody(board2, p2);
+        smazCary(board3, l3);
+        smazBody(board3, p3);
+        smazCary(board4, l4);
+        smazBody(board4, p4);
+    }
+
+    down = function (e) {
+    };
+
+    up = function (e) {
+        zapisBody(board, p);
+        smazHlavni();
+        provedHlavni();
+    };
+
+    board.on('down', down);
+    board.on('up', up);
+
+    vykresliBody(board, matice, p);
+    provedHlavni();
+
+</script>
+</p>
+</body>
+</html>

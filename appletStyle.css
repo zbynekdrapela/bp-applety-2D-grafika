@@ -1,0 +1,13 @@
+body{
+    font-family: sans-serif;
+}
+
+h1{
+    font-size: 20px;
+    margin-bottom: 0px;
+}
+header{
+    display: flex;
+    flex-wrap: wrap-reverse;
+    justify-content: space-between;
+}

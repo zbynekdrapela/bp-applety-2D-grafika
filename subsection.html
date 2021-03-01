@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="cs-cz">
+<head>
+    <meta charset="UTF-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>Subsection Bézierovy křivky</title>
+    <script charset="UTF-8" src="jsxgraphcore.js" type="text/javascript"></script>
+    <link href="jsxgraph.css" rel="stylesheet" type="text/css"/>
+    <link href="darkModeStyle.css" rel="stylesheet" type="text/css"/>
+    <link href="appletStyle.css" rel="stylesheet" type="text/css"/>
+</head>
+<body>
+<header>
+    <div class="header1"><h1>Subsection Bézierovy křivky</h1></div>
+    <div class="user-toggle">
+        <div class="[ visually-hidden ][ js-mode-status ]" role="status"></div>
+        <button class="[ toggle-button ] [ js-mode-toggle ]">
+            <span class="[ toggle-button__text ] [ js-mode-toggle-text ]">Tmavý režim</span>
+            <span aria-hidden="true" class="toggle-button__icon"></span>
+        </button>
+    </div>
+    <script charset="UTF-8" src="darkMode.js" type="text/javascript"></script>
+</header>
+<p>
+<form>
+    <input onClick="clean();" type="button" value="Kreslit znovu">
+</form>
+<div class='jxgbox' id='jxgbox' style='width:400px; height:400px;'></div>
+<script type='text/javascript'>
+    //ZAPNUTÍ A VYPNUTÍ TESTOVACÍHCH BODŮ
+    var test = false;
+
+    var p = []; //body (points)
+    var l = []; //čáry (lines)
+    var m = []; //středové body (midpoints)
+    var mL = []; //
+    var m2 = [];
+    var m2L = [];
+    var c; //křivka (curve) - bezier
+
+    function deCasteljau(vstPoints, vstT) {
+        var a, b, i, t = vstT,
+            midpoints = [],
+            returnPoints = [],
+            points = [];
+
+        for (i = 0; i < vstPoints.length; i++) {
+            points[i] = [vstPoints[i].X(), vstPoints[i].Y()]
+        }
+
+        while (points.length > 1) {
+
+            for (i = 0; i < points.length - 1; ++i) {
+                a = points[i];
+                b = points[i + 1];
+
+                midpoints.push([
+                    a[0] + ((b[0] - a[0]) * t),
+                    a[1] + ((b[1] - a[1]) * t)
+                ]);
+                returnPoints.push(midpoints[i]);
+            }
+
+            points = midpoints;
+            midpoints = [];
+        }
+
+        returnPoints.splice(1, 1);
+
+        return returnPoints;
+    }
+
+    var getMouseCoords = function (e, i) {
+            var cPos = board.getCoordsTopLeftCorner(e, i),
+                absPos = JXG.getPosition(e, i),
+                dx = absPos[0] - cPos[0],
+                dy = absPos[1] - cPos[1];
+
+            return new JXG.Coords(JXG.COORDS_BY_SCREEN, [dx, dy], board);
+        },
+        down = function (e) {
+            var canCreate, i, coords, el;
+
+            if (p.length < 4) {
+                canCreate = true;
+            } else {
+                canCreate = false;
+            }
+
+            if (e[JXG.touchProperty]) {
+                // index of the finger that is used to extract the coordinates
+                i = 0;
+            }
+            coords = getMouseCoords(e, i);
+
+            for (el in board.objects) {
+                if (JXG.isPoint(board.objects[el]) && board.objects[el].hasPoint(coords.scrCoords[1], coords.scrCoords[2])) {
+                    canCreate = false;
+                    break;
+                }
+            }
+
+            if (canCreate) {
+                //TESTOVACÍ BODY NEBO BOD KLIKNUTÍM
+                if (test) {
+                    p.push(board.create('point', [-3, 3], {name: '', label: {visible: false}}));
+                    p.push(board.create('point', [-3, -3], {name: '', label: {visible: false}}));
+                    l.push(board.create('segment', [p[0], p[1]], {strokeOpacity: 0.5}));
+                    p.push(board.create('point', [3, -3], {name: '', label: {visible: false}}));
+                    l.push(board.create('segment', [p[1], p[2]], {strokeOpacity: 0.5}));
+                    p.push(board.create('point', [3, 3], {name: '', label: {visible: false}}));
+                    l.push(board.create('segment', [p[2], p[3]], {strokeOpacity: 0.5}));
+                } else {
+                    p.push(board.create('point', [coords.usrCoords[1], coords.usrCoords[2]], {
+                        name: '',
+                        label: {visible: false}
+                    }));
+                    if (p.length > 1) {
+                        l.push(board.create('segment', [p[(p.length - 2)], p[p.length - 1]], {strokeOpacity: 0.5}));
+                    }
+                }
+                if (p.length !== 0 && (p.length % 4) === 0) {
+                    c = board.create('curve', JXG.Math.Numerics.bezier(p),
+                        {strokecolor: 'blue', strokeOpacity: 0.6, strokeWidth: 5});
+                    stupenSubsection.setAttribute({fixed: false});
+                    casRozdeleni.setAttribute({fixed: false});
+                }
+            }
+            switch (stupenSubsection.Value()) {
+                case 0:
+                    cleanM();
+                    break;
+                case 1:
+                    cleanM();
+                    break;
+                case 2:
+                    cleanM();
+                    break;
+            }
+        },
+        up = function (e) {
+            if (p.length === 4) {
+                switch (stupenSubsection.Value()) {
+                    case 0:
+                        cleanM();
+                        break;
+                    case 1:
+                        provestSubsection1();
+                        break;
+                    case 2:
+                        provestSubsection2();
+                        break;
+                }
+            }
+        };
+
+    board = JXG.JSXGraph.initBoard('jxgbox', {
+        boundingbox: [-5, 5, 5, -5], keepaspectratio: true,
+        showCopyright: false, showNavigation: false, axis: true, zoom: {enabled: false},
+        pan: {enabled: false}
+    });
+    var casRozdeleni = board.create('slider', [[1, 4.5], [3, 4.5], [0, 0.5, 1]], {
+        name: 't',
+        precision: 1,
+        needsUpdate: true,
+        fixed: true
+    });
+    var stupenSubsection = board.create('slider', [[1, 4], [3, 4], [0, 0, 2]], {
+        name: 's',
+        snapWidth: 1,
+        precision: 0,
+        needsUpdate: true,
+        fixed: true
+    });
+    board.on('down', down);
+    board.on('up', up);
+
+    var clean = function () {
+        board.suspendUpdate();
+        var i = p.length;
+        while (i >= 0) {
+            board.removeObject(p[p.length - i]);
+            i--;
+        }
+        i = l.length;
+        while (i >= 0) {
+            board.removeObject(l[l.length - i]);
+            i--;
+        }
+        board.removeObject(c);
+        //p.splice(p.length-1,1); //asi správné odebrání posledního bodu
+        //l.splice(l.length-1,1); //asi správné odebrání posledního bodu
+        p = [];
+        l = [];
+        cleanM();
+        board.unsuspendUpdate();
+    };
+
+    var cleanM = function () {
+        board.suspendUpdate();
+        var i = m.length;
+        while (i >= 0) {
+            board.removeObject(m[m.length - i]);
+            i--;
+        }
+        m = [];
+
+        i = mL.length;
+        while (i >= 0) {
+            board.removeObject(mL[mL.length - i]);
+            i--;
+        }
+        mL = [];
+
+        i = m2.length;
+        while (i >= 0) {
+            board.removeObject(m2[m2.length - i]);
+            i--;
+        }
+        m2 = [];
+
+        i = m2L.length;
+        while (i >= 0) {
+            board.removeObject(m2L[m2L.length - i]);
+            i--;
+        }
+        m2L = [];
+
+        board.unsuspendUpdate();
+    };
+
+    var provestSubsection1 = function () {
+
+        var barvaBodu = 'orange';
+        var barvaCar = 'orange';
+
+        cleanM();
+
+        i = 0;
+
+        var pomocna = deCasteljau(p, Math.round(casRozdeleni.Value() * 10) / 10);
+        var poradi = [0, 2, 4, 3, 1];
+        while (i < pomocna.length) {
+
+            m.push(board.create('point', pomocna[poradi[i]], {
+                face: 'o',
+                strokeColor: barvaBodu,
+                fillColor: barvaBodu,
+                name: '',
+                fixed: true
+            }));
+            i++;
+        }
+        i = 0;
+        mL.push(board.create('segment', [p[0], m[0]], {strokeOpacity: 0.5, color: barvaCar}));
+        mL.push(board.create('segment', [p[p.length - 1], m[m.length - 1]], {strokeOpacity: 0.5, color: barvaCar}));
+        while (i < m.length - 1) {
+            mL.push(board.create('segment', [m[i], m[i + 1]], {strokeOpacity: 0.5, color: barvaCar}));
+            i++;
+        }
+
+    };
+
+    var provestSubsection2 = function () {
+        var barvaBodu = 'green';
+        var barvaCar = 'green';
+
+        cleanM();
+        provestSubsection1();
+
+        i = 0;
+
+        var m1Cast = [p[0], m[0], m[1], m[2]];
+        var m2Cast = [m[2], m[3], m[4], p[3]];
+
+        var pomocna = deCasteljau(m1Cast, Math.round(casRozdeleni.Value() * 10) / 10);
+        var poradi = [0, 2, 4, 3, 1];
+        while (i < pomocna.length) {
+
+            m2.push(board.create('point', pomocna[poradi[i]], {
+                face: 'o',
+                strokeColor: barvaBodu,
+                fillColor: barvaBodu,
+                name: '',
+                fixed: true
+            }));
+            i++;
+        }
+        pomocna = [];
+        pomocna = deCasteljau(m2Cast, Math.round(casRozdeleni.Value() * 10) / 10);
+        i = 0;
+        while (i < pomocna.length) {
+
+            m2.push(board.create('point', pomocna[poradi[i]], {
+                face: 'o',
+                strokeColor: barvaBodu,
+                fillColor: barvaBodu,
+                name: '',
+                fixed: true
+            }));
+            i++;
+        }
+        i = 0;
+        m2L.push(board.create('segment', [p[0], m2[0]], {strokeOpacity: 0.5, color: barvaCar}));
+        m2L.push(board.create('segment', [p[p.length - 1], m2[m2.length - 1]], {strokeOpacity: 0.5, color: barvaCar}));
+        while (i < m2.length - 1) {
+            m2L.push(board.create('segment', [m2[i], m2[i + 1]], {strokeOpacity: 0.5, color: barvaCar}));
+            i++;
+        }
+
+    };
+</script>
+</p>
+</body>
+</html>
