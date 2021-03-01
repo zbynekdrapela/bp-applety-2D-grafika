@@ -15,3 +15,5 @@ Jsou určené pro podporu výuky 2D počítačové grafiky a byly zpracované v 
 Applety jsou postavené na JavaScriptu a HTML5.
 
 První tři applety staví na knihovně JSXGraph 0.99.7 (https://github.com/jsxgraph/jsxgraph), čtvrtý vychází z kódu podobného appletu, jehož autorem je Kas Thomas (http://asserttrue.blogspot.com/2012/01/turbulence-in-html5-canvas.html).
+
+Applety je možné vyzkoušet na http://bp.drapela.cz.
